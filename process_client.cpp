@@ -1,3 +1,5 @@
+#include "translation_data_type.hpp"
+
 #include <iceoryx_hoofs/posix_wrapper/signal_watcher.hpp>
 #include <iceoryx_posh/popo/client.hpp>
 #include <iceoryx_posh/runtime/posh_runtime.hpp>
@@ -9,9 +11,9 @@ int main()
     iox::runtime::PoshRuntime::initRuntime(APP_NAME);
 
     //! TODO: modify the template parameter to Arrow (the first is the request, the second is the response)
-    iox::popo::Client<std::pair<uint64_t, uint64_t>, std::pair<uint64_t, uint64_t>> client({"Example", "CURD", "Add"});
+    iox::popo::Client<TranslationRequest, TranslationResponse> client({"Example", "CURD", "Add"});
 
-    uint64_t a = 0, b = 1;
+    std::vector<uint64_t> a = {1,2,3,4};
     int64_t rsid = 0;
     int16_t ersid = rsid;
     while (!iox::posix::hasTerminationRequested())
@@ -21,9 +23,8 @@ int main()
             request.getRequestHeader().setSequenceId(rsid);
             ersid = rsid;
             rsid += 1;
-            request->first = a;
-            request->second = b;
-            std::cout<<"[Client] send: "<< a <<", "<<b<<std::endl;
+            request->data = a;
+            std::cout<<"[Client] send: "<< a.size()<<std::endl;
             request.send().or_else(
                 [&](auto& error){std::cout<<"[Client] send faild !\n";}); })
             .or_else([](auto &error)
@@ -35,9 +36,8 @@ int main()
             auto redsid = response.getResponseHeader().getSequenceId();
             if (redsid == ersid) 
             {
-                a = b;
-                b = response->first;
-                std::cout << "[Client] Got Response : " << b << std::endl;
+                a = response->data;
+                std::cout << "[Client] Got Response : " << a.size() << std::endl;
             }
             else
             {
