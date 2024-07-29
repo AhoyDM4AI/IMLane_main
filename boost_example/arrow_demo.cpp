@@ -88,12 +88,12 @@ arrow::Status RunMain(int argc, char** argv) {
   std::cout << "Table created" << std::endl;
 
   // Write table to CSV file
-  auto csv_filename = "compute_and_write_output.csv";
-  ARROW_ASSIGN_OR_RAISE(auto outstream, arrow::io::FileOutputStream::Open(csv_filename));
+  // auto csv_filename = "compute_and_write_output.csv";
+  // ARROW_ASSIGN_OR_RAISE(auto outstream, arrow::io::FileOutputStream::Open(csv_filename));
 
-  std::cout << "Writing CSV file" << std::endl;
-  ARROW_RETURN_NOT_OK(arrow::csv::WriteCSV(
-      *my_table, arrow::csv::WriteOptions::Defaults(), outstream.get()));
+  // std::cout << "Writing CSV file" << std::endl;
+  // ARROW_RETURN_NOT_OK(arrow::csv::WriteCSV(
+  //     *my_table, arrow::csv::WriteOptions::Defaults(), outstream.get()));
 
   return arrow::Status::OK();
 }
