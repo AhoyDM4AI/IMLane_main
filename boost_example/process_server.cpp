@@ -17,6 +17,12 @@
 #include <arrow/table.h>
 #include <arrow/status.h>
 
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include <arrow/python/pyarrow.h>
+
+namespace py = pybind11;
+
 int main()
 {
     /* version 1
@@ -93,7 +99,8 @@ int main()
     }
 
     std::shared_ptr<arrow::Table> my_table = *table_result;
-    std::cout << "I got the table from the shared memory \n";
+    std::cout << "I got the table from the shared memory 1\n";
+    /*
     // parse the data from shared memory
     std::shared_ptr<arrow::ChunkedArray> column1 = my_table->column(0);
     std::shared_ptr<arrow::ChunkedArray> column2 = my_table->column(1);
@@ -117,7 +124,7 @@ int main()
     my_table = *result2;
     std::cout << my_table->num_columns() << "    finished compute \n";
 
-    // print compute result 
+    // print compute result
     for (int i = 0; i < my_table->num_columns(); i++)
     {
         std::shared_ptr<arrow::ChunkedArray> column = my_table->column(i);
@@ -132,7 +139,67 @@ int main()
         }
         std::cout << std::endl;
     }
+    */
+    std::cout << "step0____________________________________\n";
+    if (!Py_IsInitialized())
+    {
+        Py_Initialize();
+    }
+    if (!Py_IsInitialized())
+    {
+        std::cout << "Python interpreter is not initialized" << std::endl;
+    }
+    else
+    {
+        std::cout << "init" << std::endl;
+    }
+    try
+    {
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
 
+        PyObject* py_table_tmp = arrow::py::wrap_table(std::move(my_table));
+
+        py::object py_table = py::reinterpret_steal<py::object>(py_table_tmp);
+
+        std::cout << "step1____________________________________\n";
+        
+
+        PyObject *py_main = PyImport_AddModule("__main__");
+        PyObject *py_dict = PyModule_GetDict(py_main);
+        std::cout << "step3____________________________________\n";
+        PyObject *py_func = PyRun_String(
+            "def sum_columns(table):\n"
+            "    import pandas as pd\n"
+            "    df = table.to_pandas()\n"
+            "    df['sum'] = df.iloc[:, 0] + df.iloc[:, 1]\n"
+            "    return pyarrow.Table.from_pandas(df)\n",
+            Py_file_input, py_dict, py_dict);
+        PyObject *py_args = PyTuple_New(1);
+        PyTuple_SetItem(py_args, 0, py_table.ptr());
+        std::cout << "step4____________________________________\n";
+        PyObject *py_result = PyObject_CallObject(py_func, py_args);
+        std::cout << "step2____________________________________\n";
+        if (py_result != NULL)
+        {
+
+            arrow::Result<std::shared_ptr<arrow::Table>> result_py_table = arrow::py::unwrap_table(py_result);
+            if (result_py_table.ok())
+            {
+                my_table = *result_py_table;
+            }
+            else
+            {
+                std::cerr << "Failed to convert result to arrow::Table: " << result_py_table.status() << std::endl;
+                return 1;
+            }
+        }
+        PyGILState_Release(gstate);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Exception caught: " << e.what() << std::endl;
+    }
     // create new buffer
     std::shared_ptr<arrow::io::BufferOutputStream> stream = arrow::io::BufferOutputStream::Create(1024 * 1024).ValueOrDie();
     std::shared_ptr<arrow::ipc::RecordBatchWriter> writer;

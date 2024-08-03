@@ -10,7 +10,7 @@
 ```shell
 cd cpp
 mkdir build && cd build
-cmake -DARROW_CSV=ON ..
+cmake -DARROW_CSV=ON -DARROW_PYTHON=ON ..
 make -j32 && make install
 ```
 
