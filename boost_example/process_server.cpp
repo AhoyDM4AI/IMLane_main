@@ -140,66 +140,70 @@ int main()
         std::cout << std::endl;
     }
     */
-    std::cout << "step0____________________________________\n";
     if (!Py_IsInitialized())
     {
         Py_Initialize();
     }
-    if (!Py_IsInitialized())
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
+    if (arrow::py::import_pyarrow())
     {
-        std::cout << "Python interpreter is not initialized" << std::endl;
+        std::cout << "import pyarrow error!\n";
+        exit(0);
+    }
+
+    PyObject *py_table_tmp = arrow::py::wrap_table(std::move(my_table));
+
+    PyObject *py_main = PyImport_AddModule("__main__");
+    PyObject *py_dict = PyModule_GetDict(py_main);
+
+    const char *python_code = R"(
+import pyarrow as pa
+
+def process_table(table):
+    col1 = table.column(0).to_pylist()
+    col2 = table.column(1).to_pylist()
+    result = [a + b for a, b in zip(col1, col2)]
+    result_field = pa.field('result', pa.int64())
+    result_schema = pa.schema([result_field])
+    result_array = pa.array(result, type=pa.int64())
+    result_table = pa.Table.from_arrays([result_array], schema=result_schema)
+    return result_table
+)";
+
+    PyRun_SimpleString(python_code);
+
+    PyObject *main_module = PyImport_AddModule("__main__");
+    PyObject *main_dict = PyModule_GetDict(main_module);
+    PyObject *func = PyDict_GetItemString(main_dict, "process_table");
+
+    PyObject *args = PyTuple_Pack(1, py_table_tmp);
+    PyObject *py_result = PyObject_CallObject(func, args);
+
+
+    if (py_result != NULL)
+
+    {
+        std::cout << "you can come here!\n";
+        arrow::Result<std::shared_ptr<arrow::Table>> result_py_table = arrow::py::unwrap_table(py_result);
+        if (result_py_table.ok())
+        {
+            my_table = *result_py_table;
+        }
+        else
+        {
+            std::cerr << "Failed to convert result to arrow::Table: " << result_py_table.status() << std::endl;
+            return 1;
+        }
     }
     else
     {
-        std::cout << "init" << std::endl;
+        PyErr_Print();
+        std::cout << "you can unwarp it\n";
+        my_table = arrow::py::unwrap_table(py_table_tmp).ValueOrDie();
     }
-    try
-    {
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
 
-        PyObject* py_table_tmp = arrow::py::wrap_table(std::move(my_table));
-
-        py::object py_table = py::reinterpret_steal<py::object>(py_table_tmp);
-
-        std::cout << "step1____________________________________\n";
-        
-
-        PyObject *py_main = PyImport_AddModule("__main__");
-        PyObject *py_dict = PyModule_GetDict(py_main);
-        std::cout << "step3____________________________________\n";
-        PyObject *py_func = PyRun_String(
-            "def sum_columns(table):\n"
-            "    import pandas as pd\n"
-            "    df = table.to_pandas()\n"
-            "    df['sum'] = df.iloc[:, 0] + df.iloc[:, 1]\n"
-            "    return pyarrow.Table.from_pandas(df)\n",
-            Py_file_input, py_dict, py_dict);
-        PyObject *py_args = PyTuple_New(1);
-        PyTuple_SetItem(py_args, 0, py_table.ptr());
-        std::cout << "step4____________________________________\n";
-        PyObject *py_result = PyObject_CallObject(py_func, py_args);
-        std::cout << "step2____________________________________\n";
-        if (py_result != NULL)
-        {
-
-            arrow::Result<std::shared_ptr<arrow::Table>> result_py_table = arrow::py::unwrap_table(py_result);
-            if (result_py_table.ok())
-            {
-                my_table = *result_py_table;
-            }
-            else
-            {
-                std::cerr << "Failed to convert result to arrow::Table: " << result_py_table.status() << std::endl;
-                return 1;
-            }
-        }
-        PyGILState_Release(gstate);
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << "Exception caught: " << e.what() << std::endl;
-    }
+    std::cout << my_table->num_columns() << std::endl;
     // create new buffer
     std::shared_ptr<arrow::io::BufferOutputStream> stream = arrow::io::BufferOutputStream::Create(1024 * 1024).ValueOrDie();
     std::shared_ptr<arrow::ipc::RecordBatchWriter> writer;
@@ -221,5 +225,6 @@ int main()
     std::cout << "finish write the table buffer in the shared memory\n";
     cnd->notify_all();
     cnd->wait(lock);
+    PyGILState_Release(gstate);
     return 0;
 }

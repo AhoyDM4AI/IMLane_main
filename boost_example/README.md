@@ -6,16 +6,22 @@
 ```
 
 ## Arrow
+镜像需要使用 arrow仓库中的`./ci/docker/ubuntu-20.04-cpp-minimal.dockerfile`编译一个镜像创建环境，可以确保下面的指令正常进行，不管指令是否全部正确执行，他都会生成一个新的image(名字和taget都是None，但是他是能用的)。
 
 ```shell
+git clone -b release-16.1.0-rc0 https://github.com/apache/arrow.git
+git submodule update --init
 cd cpp
 mkdir build && cd build
-cmake -DARROW_CSV=ON -DARROW_PYTHON=ON ..
+cmake -DARROW_CSV=ON -DARROW_JSON=ON -DARROW_FILESYSTEM=ON -DARROW_COMPUTE=ON ..
 make -j32 && make install
+
+cd python
+PYARROW_WITH_COMPUTE=1 PYARROW_PARALLEL=32 PYARROW_WITH_CSV=1 PYARROW_WITH_JSON=1 PYARROW_WITH_FILESYSTEM=1 python setup.py build_ext --bundle-arrow-cpp bdist_wheel
 ```
 
 
-
+下面这些内容不重要，如果是使用了dockerfile的环境的话
 ```shell
 # abseil-cpp
 git clone https://github.com/abseil/abseil-cpp.git
