@@ -1,11 +1,6 @@
 #include "shm_manager.hpp"
 
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/containers/string.hpp>
-#include <boost/interprocess/sync/interprocess_mutex.hpp>
-#include <boost/interprocess/sync/interprocess_condition.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
+#include <boost/interprocess/sync/interprocess_semaphore.hpp>
 #include <iostream>
 #include <string>
 #include <arrow/array.h>
@@ -20,11 +15,12 @@
 
 int main()
 {
+    std::cout<< "[Server] start the server program\n";
     // create shared memory and lock
     SharedMemoryManagerTMP manager("MySharedMemory");
-    bi::interprocess_mutex *mtx = manager.segment.find<bi::interprocess_mutex>("mtx").first;
-    bi::interprocess_condition *cnd = manager.segment.find<bi::interprocess_condition>("cnd").first;
-    bi::scoped_lock<bi::interprocess_mutex> lock(*mtx);
+    bi::interprocess_semaphore *sem_a= manager.segment.find<bi::interprocess_semaphore>("semA").first;
+    bi::interprocess_semaphore *sem_b= manager.segment.find<bi::interprocess_semaphore>("semB").first;
+    sem_b->wait();
 
     // get the client table from the shared memory
     char *shm_ptr = manager.segment.find<char>("MyTable").first;
@@ -94,8 +90,13 @@ int main()
 
     const char *python_code = R"(
 import pyarrow as pa
+import torch
 
 def process_table(table):
+    a1 = torch.rand([3,4,5])
+    a2 = torch.rand([3,4,5])
+    rrr = a1*a2
+    print(rrr.shape)
     col1 = table.column(0).to_pylist()
     col2 = table.column(1).to_pylist()
     result = [a + b for a, b in zip(col1, col2)]
@@ -157,8 +158,7 @@ def process_table(table):
     shm_ptr = manager.segment.construct<char>("MyResult")[buffer->size()]();
     std::memcpy(shm_ptr, buffer->data(), buffer->size());
     std::cout << "[Server] finish write the table buffer in the shared memory\n";
-    cnd->notify_all();
-    cnd->wait(lock);
+    sem_a->post();
     PyGILState_Release(gstate);
     return 0;
 }

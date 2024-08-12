@@ -1,3 +1,18 @@
+# UDF Server Demo base on Boost
+
+`process_client.cpp` : client端
+`process_server.cpp` : server端
+`shm_manager.hpp` : 共享内存管理器
+
+编译后会有可执行文件./client和./server
+
+只用运行./client就可以了
+
+其他说明：
+
+`py_warp_example.cpp` : 这个是arrow::table 在c++和python端转化的例子
+`test1.cpp`和`test2.cpp` ： 是检测从单个执行端调用的例子
+
 ## boost install
 
 ```shell

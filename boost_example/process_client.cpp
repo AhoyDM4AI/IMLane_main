@@ -1,13 +1,9 @@
 #include "shm_manager.hpp"
 
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/containers/string.hpp>
-#include <boost/interprocess/sync/interprocess_mutex.hpp>
-#include <boost/interprocess/sync/interprocess_condition.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
+#include <boost/interprocess/sync/interprocess_semaphore.hpp>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <arrow/array.h>
 #include <arrow/builder.h>
 #include <arrow/ipc/api.h>
@@ -19,13 +15,13 @@
 
 int main()
 {
-  // create shared memory and lock
+  // create shared memory and semaphore
   SharedMemoryManagerTMP manager("MySharedMemory");
-  bi::interprocess_mutex *mtx = manager.segment.construct<bi::interprocess_mutex>("mtx")();
-  bi::interprocess_condition *cnd = manager.segment.construct<bi::interprocess_condition>("cnd")();
-  bi::scoped_lock<bi::interprocess_mutex> lock(*mtx);
-
-
+  bi::interprocess_semaphore *sem_a = manager.segment.construct<bi::interprocess_semaphore>("semA")(0);
+  bi::interprocess_semaphore *sem_b = manager.segment.construct<bi::interprocess_semaphore>("semB")(0);
+  std::thread t([]()
+                { std::system("./server"); });
+  t.detach();
   // create table data
   arrow::Int64Builder builder;
   builder.AppendValues({1, 2, 3, 4, 5});
@@ -76,9 +72,10 @@ int main()
       std::cout << std::endl;
     }
   }
+
   // wait for the server to read the table
-  cnd->notify_all();
-  cnd->wait(lock);
+  sem_b->post();
+  sem_a->wait();
   {
     std::cout << "[Client] OK I got it\n";
     // recieve the server result
@@ -112,7 +109,7 @@ int main()
     my_table = *table_result;
 
     // read the result table
-    std::cout<<"[Client] The result table is:\n";
+    std::cout << "[Client] The result table is:\n";
     for (int i = 0; i < my_table->num_columns(); i++)
     {
       std::shared_ptr<arrow::ChunkedArray> column = my_table->column(i);
@@ -129,7 +126,7 @@ int main()
     }
   }
   //  close the server
-  cnd->notify_all();
+
   // destroy the shared memory
   bi::shared_memory_object::remove("MySharedMemory");
   return 0;
