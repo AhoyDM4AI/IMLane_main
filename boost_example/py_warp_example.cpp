@@ -37,7 +37,7 @@ int main()
 
     std::shared_ptr<arrow::Table> my_table = arrow::Table::Make(schema, {array1, array2});
 
-    const char* python_code = R"(
+    const char *python_code = R"(
 import pyarrow as pa
 
 def process_table(table):
@@ -48,24 +48,50 @@ def process_table(table):
     result_schema = pa.schema([result_field])
     result_array = pa.array(result, type=pa.int64())
     result_table = pa.Table.from_arrays([result_array], schema=result_schema)
+    print(result_table)
     return result_table
+
+class MyTable:
+    def __init__(self, table):
+        self.table = table
+        self.name = "MyTable"
+        self.age = 18
+
+
+    def process(self, table):
+        # print("2333")
+        print(self.name)
+        print(self.age)
+        return process_table(table)
 )";
 
     PyRun_SimpleString(python_code);
-    
+
     PyObject *py_table_tmp = arrow::py::wrap_table(my_table);
 
     PyObject *main_module = PyImport_AddModule("__main__");
     PyObject *main_dict = PyModule_GetDict(main_module);
-    PyObject *func = PyDict_GetItemString(main_dict, "process_table");
+    PyObject *MyTable = PyDict_GetItemString(main_dict, "MyTable");
 
     PyObject *args = PyTuple_Pack(1, py_table_tmp);
-    PyObject *result = PyObject_CallObject(func, args);
+    PyObject *my_table_instance = PyObject_CallObject(MyTable, args);
+    // Py_DECREF(my_table_instance);
+    // std::cout<<"step1______________________\n";
+    PyObject *result = PyObject_CallMethod(my_table_instance, "process", "O", py_table_tmp);
+    // std::cout<<"step2______________________\n";
 
+    
+
+    // PyObject *func = PyDict_GetItemString(main_dict, "process_table");
+    // PyObject *args = PyTuple_Pack(1, py_table_tmp);
+    // PyObject *result = PyObject_CallObject(func, args);
+    // std::cout<<"step3______________________\n";
     std::cout<<"result no null: " <<(result != NULL)<<std::endl;
-    if(result == NULL){
-        PyErr_Print();
-    }
+    // std::cout<<"step4______________________\n";
+
+    // if(result == NULL){
+    //     PyErr_Print();
+    // }
     PyGILState_Release(gstate);
     Py_Finalize();
     return 0;

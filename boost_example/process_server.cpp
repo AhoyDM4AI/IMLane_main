@@ -15,16 +15,20 @@
 
 int main()
 {
-    std::cout<< "[Server] start the server program\n";
+    std::cout << "[Server] start the server program\n";
     // create shared memory and lock
     SharedMemoryManagerTMP manager("MySharedMemory");
-    bi::interprocess_semaphore *sem_a= manager.segment.find<bi::interprocess_semaphore>("semA").first;
-    bi::interprocess_semaphore *sem_b= manager.segment.find<bi::interprocess_semaphore>("semB").first;
+    bi::interprocess_semaphore *sem_a = manager.segment.find<bi::interprocess_semaphore>("semA").first;
+    bi::interprocess_semaphore *sem_b = manager.segment.find<bi::interprocess_semaphore>("semB").first;
     sem_b->wait();
 
     // get the client table from the shared memory
     char *shm_ptr = manager.segment.find<char>("MyTable").first;
     std::size_t size = manager.segment.find<char>("MyTable").second;
+
+    char *shm_str_ptr = manager.segment.find<char>("MyCode").first;
+    std::size_t str_size = manager.segment.find<char>("MyCode").second;
+    std::string code(shm_str_ptr, str_size);
 
     // transform the buffer to table
     std::shared_ptr<arrow::Buffer> buffer = arrow::Buffer::Wrap(shm_ptr, size);
@@ -88,34 +92,16 @@ int main()
     PyObject *py_main = PyImport_AddModule("__main__");
     PyObject *py_dict = PyModule_GetDict(py_main);
 
-    const char *python_code = R"(
-import pyarrow as pa
-import torch
 
-def process_table(table):
-    a1 = torch.rand([3,4,5])
-    a2 = torch.rand([3,4,5])
-    rrr = a1*a2
-    print(rrr.shape)
-    col1 = table.column(0).to_pylist()
-    col2 = table.column(1).to_pylist()
-    result = [a + b for a, b in zip(col1, col2)]
-    result_field = pa.field('result', pa.int64())
-    result_schema = pa.schema([result_field])
-    result_array = pa.array(result, type=pa.int64())
-    result_table = pa.Table.from_arrays([result_array], schema=result_schema)
-    return result_table
-)";
-
-    PyRun_SimpleString(python_code);
+    PyRun_SimpleString(code.c_str());
 
     PyObject *main_module = PyImport_AddModule("__main__");
     PyObject *main_dict = PyModule_GetDict(main_module);
-    PyObject *func = PyDict_GetItemString(main_dict, "process_table");
+    PyObject *MyTable = PyDict_GetItemString(main_dict, "MyTable");
 
     PyObject *args = PyTuple_Pack(1, py_table_tmp);
-    PyObject *py_result = PyObject_CallObject(func, args);
-
+    PyObject *my_table_instance = PyObject_CallObject(MyTable, args);
+    PyObject *py_result = PyObject_CallMethod(my_table_instance, "process", "O", py_table_tmp);
 
     if (py_result != NULL)
 

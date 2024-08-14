@@ -10,7 +10,7 @@ namespace bi = boost::interprocess;
 class SharedMemoryManagerTMP {
 public:
     SharedMemoryManagerTMP(const std::string& name)
-        : segment(boost::interprocess::open_or_create, name.c_str(), 65536) {}
+        : segment(boost::interprocess::open_or_create, name.c_str(), 32*1024*1024) {}
 
     template <typename T>
     T* allocate(const std::string& name, std::size_t size) {

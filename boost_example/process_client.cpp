@@ -35,6 +35,37 @@ int main()
 
   auto schema = arrow::schema({arrow::field("a", arrow::int64()), arrow::field("b", arrow::int64())});
   std::shared_ptr<arrow::Table> my_table = arrow::Table::Make(schema, {array1, array2});
+  std::string python_code = R"(
+import pyarrow as pa
+import torch
+
+def process_table(table):
+    a1 = torch.rand([3,4,5])
+    a2 = torch.rand([3,4,5])
+    rrr = a1*a2
+    print(rrr.shape)
+    col1 = table.column(0).to_pylist()
+    col2 = table.column(1).to_pylist()
+    result = [a + b for a, b in zip(col1, col2)]
+    result_field = pa.field('result', pa.int64())
+    result_schema = pa.schema([result_field])
+    result_array = pa.array(result, type=pa.int64())
+    result_table = pa.Table.from_arrays([result_array], schema=result_schema)
+    return result_table
+
+class MyTable:
+    def __init__(self, table):
+        self.table = table
+        self.name = "MyTable"
+        self.age = 18
+
+
+    def process(self, table):
+        # print("2333")
+        print(self.name)
+        print(self.age)
+        return process_table(table)
+)";
   {
     // transform the table to buffer
     std::shared_ptr<arrow::Buffer> buffer;
@@ -56,6 +87,8 @@ int main()
     // write the table to share memory
     char *shm_ptr = manager.segment.construct<char>("MyTable")[buffer->size()]();
     std::memcpy(shm_ptr, buffer->data(), buffer->size());
+    char *shm_str_ptr = manager.segment.construct<char>("MyCode")[python_code.size()]();
+    std::memcpy(shm_str_ptr, python_code.c_str(), python_code.size());
     std::cout << "[Client] finish write the table buffer in the shared memory\n";
     for (int i = 0; i < my_table->num_columns(); i++)
     {
