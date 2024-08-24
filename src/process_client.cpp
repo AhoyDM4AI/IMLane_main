@@ -37,13 +37,13 @@ int main()
   std::shared_ptr<arrow::Table> my_table = arrow::Table::Make(schema, {array1, array2});
   std::string python_code = R"(
 import pyarrow as pa
-import torch
+#import torch
 
 def process_table(table):
-    a1 = torch.rand([3,4,5])
-    a2 = torch.rand([3,4,5])
-    rrr = a1*a2
-    print(rrr.shape)
+#    a1 = torch.rand([3,4,5])
+#    a2 = torch.rand([3,4,5])
+#    rrr = a1*a2
+#    print(rrr.shape)
     col1 = table.column(0).to_pylist()
     col2 = table.column(1).to_pylist()
     result = [a + b for a, b in zip(col1, col2)]

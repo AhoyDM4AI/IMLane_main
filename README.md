@@ -1,5 +1,15 @@
 # UDF Server Demo base on Boost
 
+## 编译方式
+
+```shell
+cd src
+mkdir build && cd build
+make -j
+```
+
+## 文件说明
+
 `process_client.cpp` : client端
 
 `process_server.cpp` : server端
@@ -10,20 +20,17 @@
 
 只用运行./client就可以了
 
-其他说明：
 
-`py_warp_example.cpp` : 这个是arrow::table 在c++和python端转化的例子
+## 部分环境安装
 
-`test1.cpp`和`test2.cpp` ： 是检测从单个执行端调用的例子
-
-## boost install
+### boost install
 
 ```shell
 ./bootstrap.sh
 ./b2 install cxxflags="-std=c++14"
 ```
 
-## Arrow
+### Arrow
 
 docker pull apache/arrow-dev:amd64-ubuntu-20.04-r-4.4
 
@@ -40,7 +47,7 @@ PYARROW_WITH_COMPUTE=1 PYARROW_PARALLEL=32 PYARROW_WITH_CSV=1 PYARROW_WITH_JSON=
 ```
 
 
-下面这些内容不重要，如果是使用了dockerfile的环境的话
+### 按需环境安装
 
 ```shell
 # abseil-cpp
