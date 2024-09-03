@@ -3,6 +3,7 @@
 #include <string>
 #include <thread>
 
+#include <arrow/array/concatenate.h>
 #include <arrow/api.h>
 #include <arrow/status.h>
 #include <arrow/c/abi.h>
@@ -99,7 +100,7 @@ int main()
     // 转化
     std::shared_ptr<arrow::Schema> arrow_schema;
     std::vector<std::shared_ptr<arrow::Array>> arrow_array;
-    
+
     arrow_schema = arrow::ImportSchema(&parent_schema).ValueOrDie();
     for (int i = 0; i < parent_array.n_children; i++)
     {
@@ -123,6 +124,29 @@ int main()
         }
         std::cout << std::endl;
     }
+
+    // 创建一个ArrowArray结构体
+    std::shared_ptr<arrow::ChunkedArray> column = my_table->column(0);
+    std::vector<std::shared_ptr<arrow::Array>> chunks = column->chunks();
+    // 将所有的chunks合并成一个arrow::Array
+    std::shared_ptr<arrow::Array> array = arrow::Concatenate(chunks).ValueOrDie();
+
+    ArrowArray c_array;
+    arrow::Status status = arrow::ExportArray(*array, &c_array);
+
+
+    std::cout<<"c_ArrowArray : [";
+    // 打印数据
+    for (int64_t i = 0; i < c_array.length; ++i)
+    {
+        // 获取数据
+        const void *data = c_array.buffers[1];
+        const int64_t *values = static_cast<const int64_t *>(data);
+
+        // 打印数据
+        std::cout << values[i] << ", ";
+    }
+    std::cout<<"]\n";
 
     // 清理
     free(parent_array.children);
